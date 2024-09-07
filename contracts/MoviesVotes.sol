@@ -23,6 +23,8 @@ contract MovieVotes {
     event PollCreated(uint pollId, string[] movies, uint deadline);
     event VotingEnded(uint pollId, string winner);
 
+    error NotOwner(address caller);
+
     constructor() {
         contractOwner = msg.sender;
         pollCounter = 0;
@@ -30,11 +32,6 @@ contract MovieVotes {
 
     modifier inPollState(uint _pollId, VotingState _state) {
         require(polls[_pollId].votingState == _state, "Invalid state for this poll");
-        _;
-    }
-
-    modifier onlyPollOwner(uint _pollId) {
-        require(msg.sender == polls[_pollId].pollOwner, "Only the poll owner can perform this action");
         _;
     }
 
@@ -74,7 +71,11 @@ contract MovieVotes {
         poll.voters.push(msg.sender);
     }
 
-    function endMoviePoll(uint _pollId) public onlyPollOwner(_pollId) inPollState(_pollId, VotingState.Ongoing) {
+    function endMoviePoll(uint _pollId) public inPollState(_pollId, VotingState.Ongoing) {
+        if(!(msg.sender == polls[_pollId].pollOwner)) {
+            revert NotOwner(msg.sender);
+        }
+
         Poll storage poll = polls[_pollId];
         poll.votingState = VotingState.Finished;
         determineWinner(_pollId);
