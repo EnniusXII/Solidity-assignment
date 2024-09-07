@@ -19,6 +19,7 @@ contract MovieVotes {
     address public contractOwner;
     uint public pollCounter;
     mapping(uint => Poll) public polls;
+    bool public contractPaused;
 
     event PollCreated(uint pollId, string[] movies, uint deadline);
     event VotingEnded(uint pollId, string winner);
@@ -37,6 +38,11 @@ contract MovieVotes {
         _;
     }
 
+    modifier notPaused() {
+        require(!contractPaused, "Contract is paused");
+        _;
+    }
+
     fallback() external {
         emit FallbackCalled(msg.sender);
         revert("Fallback function. Call a function that exists!");
@@ -46,7 +52,19 @@ contract MovieVotes {
         emit DonationReceived(msg.sender, msg.value, "Thank you for your donation!");
     }
 
-    function createMovieVotes(string[] memory _movies, uint _durationInSeconds) public {
+    function pauseContract() external {
+        require(msg.sender == contractOwner, "Only contract owner can pause");
+        require(!contractPaused, "Contract is already paused");
+        contractPaused = true;
+    }
+
+    function unpauseContract() external {
+        require(msg.sender == contractOwner, "Only contract owner can unpause");
+        require(contractPaused, "Contract is not paused");
+        contractPaused = false;
+    }
+
+    function createMovieVotes(string[] memory _movies, uint _durationInSeconds) public notPaused {
         require(_movies.length > 1, "Poll must have at least two movies");
 
         pollCounter++;
@@ -63,7 +81,7 @@ contract MovieVotes {
         emit PollCreated(pollCounter, _movies, newPoll.votingDeadline);
     }
 
-    function vote(uint _pollId, string memory _movie) public inPollState(_pollId, VotingState.Ongoing) {
+    function vote(uint _pollId, string memory _movie) public notPaused inPollState(_pollId, VotingState.Ongoing) {
         Poll storage poll = polls[_pollId];
         require(block.timestamp < polls[_pollId].votingDeadline, "Poll has ended");
         require(!poll.hasVoted[msg.sender], "You have already cast a vote");
@@ -84,7 +102,7 @@ contract MovieVotes {
         assert(block.timestamp < polls[_pollId].votingDeadline);
     }
 
-    function endMoviePoll(uint _pollId) public inPollState(_pollId, VotingState.Ongoing) {
+    function endMoviePoll(uint _pollId) public notPaused inPollState(_pollId, VotingState.Ongoing) {
         if(!(msg.sender == polls[_pollId].pollOwner)) {
             revert NotOwner(msg.sender);
         }
@@ -94,7 +112,7 @@ contract MovieVotes {
         determineWinner(_pollId);
     }
 
-    function checkPollDeadline(uint _pollId) public inPollState(_pollId, VotingState.Ongoing) {
+    function checkPollDeadline(uint _pollId) public notPaused inPollState(_pollId, VotingState.Ongoing) {
         Poll storage poll = polls[_pollId];
         require(block.timestamp >= poll.votingDeadline, "Poll deadline has not been reached yet");
         poll.votingState = VotingState.Finished;
