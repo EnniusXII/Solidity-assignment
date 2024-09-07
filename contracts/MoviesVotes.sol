@@ -69,6 +69,8 @@ contract MovieVotes {
         require(movieExists, "Movie not found");
         poll.hasVoted[msg.sender] = true;
         poll.voters.push(msg.sender);
+        
+        assert(block.timestamp < polls[_pollId].votingDeadline);
     }
 
     function endMoviePoll(uint _pollId) public inPollState(_pollId, VotingState.Ongoing) {
