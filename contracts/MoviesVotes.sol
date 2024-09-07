@@ -20,6 +20,7 @@ contract MovieVotes {
     uint public pollCounter;
     mapping(uint => Poll) public polls;
     bool public contractPaused;
+    mapping(address => bool) public blacklist;
 
     event PollCreated(uint pollId, string[] movies, uint deadline);
     event VotingEnded(uint pollId, string winner);
@@ -33,6 +34,11 @@ contract MovieVotes {
         pollCounter = 0;
     }
 
+    modifier isContractOwner() {
+        require(msg.sender == contractOwner, "Only contract owner can perform this action");
+        _;
+    }
+
     modifier inPollState(uint _pollId, VotingState _state) {
         require(polls[_pollId].votingState == _state, "Invalid state for this poll");
         _;
@@ -40,6 +46,11 @@ contract MovieVotes {
 
     modifier notPaused() {
         require(!contractPaused, "Contract is paused");
+        _;
+    }
+
+    modifier notBanned() {
+        require(!blacklist[msg.sender], "You have been banned");
         _;
     }
 
@@ -52,19 +63,25 @@ contract MovieVotes {
         emit DonationReceived(msg.sender, msg.value, "Thank you for your donation!");
     }
 
-    function pauseContract() external {
-        require(msg.sender == contractOwner, "Only contract owner can pause");
+    function pauseContract() external isContractOwner {
         require(!contractPaused, "Contract is already paused");
         contractPaused = true;
     }
 
-    function unpauseContract() external {
-        require(msg.sender == contractOwner, "Only contract owner can unpause");
+    function unpauseContract() external isContractOwner {
         require(contractPaused, "Contract is not paused");
         contractPaused = false;
     }
 
-    function createMovieVotes(string[] memory _movies, uint _durationInSeconds) public notPaused {
+    function banUser(address _accountAddress) external isContractOwner {
+        blacklist[_accountAddress] = true;
+    }
+
+    function unBanUser(address _accountAddress) external isContractOwner {
+        blacklist[_accountAddress] = false;
+    }
+
+    function createMovieVotes(string[] memory _movies, uint _durationInSeconds) public notPaused notBanned {
         require(_movies.length > 1, "Poll must have at least two movies");
 
         pollCounter++;
@@ -81,7 +98,7 @@ contract MovieVotes {
         emit PollCreated(pollCounter, _movies, newPoll.votingDeadline);
     }
 
-    function vote(uint _pollId, string memory _movie) public notPaused inPollState(_pollId, VotingState.Ongoing) {
+    function vote(uint _pollId, string memory _movie) public notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
         Poll storage poll = polls[_pollId];
         require(block.timestamp < polls[_pollId].votingDeadline, "Poll has ended");
         require(!poll.hasVoted[msg.sender], "You have already cast a vote");
@@ -102,7 +119,7 @@ contract MovieVotes {
         assert(block.timestamp < polls[_pollId].votingDeadline);
     }
 
-    function endMoviePoll(uint _pollId) public notPaused inPollState(_pollId, VotingState.Ongoing) {
+    function endMoviePoll(uint _pollId) public notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
         if(!(msg.sender == polls[_pollId].pollOwner)) {
             revert NotOwner(msg.sender);
         }
@@ -112,7 +129,7 @@ contract MovieVotes {
         determineWinner(_pollId);
     }
 
-    function checkPollDeadline(uint _pollId) public notPaused inPollState(_pollId, VotingState.Ongoing) {
+    function checkPollDeadline(uint _pollId) public notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
         Poll storage poll = polls[_pollId];
         require(block.timestamp >= poll.votingDeadline, "Poll deadline has not been reached yet");
         poll.votingState = VotingState.Finished;
