@@ -22,6 +22,8 @@ contract MovieVotes {
 
     event PollCreated(uint pollId, string[] movies, uint deadline);
     event VotingEnded(uint pollId, string winner);
+    event FallbackCalled(address indexed accountAddress);
+    event DonationReceived(address donor, uint amount, string message);
 
     error NotOwner(address caller);
 
@@ -33,6 +35,15 @@ contract MovieVotes {
     modifier inPollState(uint _pollId, VotingState _state) {
         require(polls[_pollId].votingState == _state, "Invalid state for this poll");
         _;
+    }
+
+    fallback() external {
+        emit FallbackCalled(msg.sender);
+        revert("Fallback function. Call a function that exists!");
+    }
+
+    receive() external payable {
+        emit DonationReceived(msg.sender, msg.value, "Thank you for your donation!");
     }
 
     function createMovieVotes(string[] memory _movies, uint _durationInSeconds) public {
@@ -69,7 +80,7 @@ contract MovieVotes {
         require(movieExists, "Movie not found");
         poll.hasVoted[msg.sender] = true;
         poll.voters.push(msg.sender);
-        
+
         assert(block.timestamp < polls[_pollId].votingDeadline);
     }
 
