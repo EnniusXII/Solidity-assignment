@@ -81,7 +81,7 @@ contract MovieVotes {
         blacklist[_accountAddress] = false;
     }
 
-    function createMovieVotes(string[] memory _movies, uint _durationInSeconds) public notPaused notBanned {
+    function createMovieVotes(string[] memory _movies, uint _durationInSeconds) external notPaused notBanned {
         require(_movies.length > 1, "Poll must have at least two movies");
 
         pollCounter++;
@@ -98,7 +98,7 @@ contract MovieVotes {
         emit PollCreated(pollCounter, _movies, newPoll.votingDeadline);
     }
 
-    function vote(uint _pollId, string memory _movie) public notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
+    function vote(uint _pollId, string memory _movie) external notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
         Poll storage poll = polls[_pollId];
         require(block.timestamp < polls[_pollId].votingDeadline, "Poll has ended");
         require(!poll.hasVoted[msg.sender], "You have already cast a vote");
@@ -119,7 +119,7 @@ contract MovieVotes {
         assert(block.timestamp < polls[_pollId].votingDeadline);
     }
 
-    function endMoviePoll(uint _pollId) public notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
+    function endMoviePoll(uint _pollId) external notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
         if(!(msg.sender == polls[_pollId].pollOwner)) {
             revert NotOwner(msg.sender);
         }
@@ -129,7 +129,7 @@ contract MovieVotes {
         determineWinner(_pollId);
     }
 
-    function checkPollDeadline(uint _pollId) public notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
+    function checkPollDeadline(uint _pollId) external notPaused notBanned inPollState(_pollId, VotingState.Ongoing) {
         Poll storage poll = polls[_pollId];
         require(block.timestamp >= poll.votingDeadline, "Poll deadline has not been reached yet");
         poll.votingState = VotingState.Finished;
@@ -154,12 +154,12 @@ contract MovieVotes {
         emit VotingEnded(_pollId, winningMovie);
     }
 
-    function getMovieVoteCounts(uint _pollId) public view returns (string[] memory, uint[] memory) {
+    function getMovieVoteCounts(uint _pollId) external view returns (string[] memory, uint[] memory) {
         Poll storage poll = polls[_pollId];
         return (poll.movies, poll.voteCount);
     }
 
-    function getPollWinner(uint _pollId) public view returns (string memory) {
+    function getPollWinner(uint _pollId) external view returns (string memory) {
         return polls[_pollId].winner;
     }
 }
